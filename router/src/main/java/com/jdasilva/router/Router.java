@@ -48,9 +48,9 @@ public class Router {
                 Socket socket = serverSocket.accept();
                 int idClient = idCounter++;
                 connections.put(idClient, socket);
-                System.out.println(type + " id: " + idClient + " connected");
                 new Thread(() -> handleClient(socket, idClient, type)).start();
             } catch (IOException e) {
+                System.out.println("Error: " + type + " connection failed");
                 e.printStackTrace();
             } 
         }
@@ -63,23 +63,30 @@ public class Router {
             System.out.println(type + " id: " + clientId + " connected to the server");
             String message;
             while ((message = reader.readLine()) != null) {
-                System.out.println(type + " " + clientId + " says: " + message);
+                System.out.println("Message received from " + type + " id " + clientId + ": " + message);
                 if(!validateCheckshum(message)){
                     System.out.println("Error: Invalid checksum");
                     continue;
                 }
                 Map<String, String> fields = parseFIXMessage(message);
-                int destinationId = Integer.parseInt(fields.get("56"));
+                String destinationIdString = fields.get("56");
+                Socket destination;
+                if("MARKET".equals(destinationIdString)){
+                    destination = findMarketSocket();
+                } else {
+                    int destinationId = Integer.parseInt(destinationIdString);
+                    destination = getDestination(destinationId);
+                }
 
-                Socket destination = getDestination(destinationId);
                 if(destination != null){
                     fowardMessage(message, destination);
-                    System.out.println("Message fowarded to destination " + destinationId + ": " + message);
+                    System.out.println("Message fowarded to " + destination + ": " + message);
                 } else {
                     System.out.println("Error: Destination not found");
                 }
             }
         } catch (Exception e) {
+            System.out.println(type + " id: " + clientId + " disconnected from the server");
             e.printStackTrace();
         }
     }
@@ -104,13 +111,19 @@ public class Router {
     }
 
     private int calculateCheckshum(String message) {
+        int checksumIndex = message.indexOf("10=");
+        String messageWithoutChecksum = (checksumIndex != -1) ? message.substring(0, checksumIndex) : message;
         int sum = 0;
-        for (char c : message.toCharArray()) {
+        for (char c : messageWithoutChecksum.toCharArray()) {
             sum += c;
         }
         return sum % 256;
     }
 
+    private Socket findMarketSocket() {
+        return markets.values().stream().findAny().orElse(null);
+    }
+    
     private Socket getDestination(int destinationId) {
         if (brokers.containsKey(destinationId)) {
             return brokers.get(destinationId);

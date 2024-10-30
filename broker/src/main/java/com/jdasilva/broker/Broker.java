@@ -1,5 +1,6 @@
 package com.jdasilva.broker;
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
@@ -17,20 +18,17 @@ public class Broker {
     public void start() {
         try{
             socket = new Socket(host, port);
-            System.out.println("Broker connected to the server " + socket);
-            out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
-            System.out.println("Broker connected to the server out: " + out);
+            out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()), true);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            System.out.println("Broker connected to the server in: " + in);
-            System.out.println("Broker connected to the server in.readLine(): " + in.readLine());
             brokerId = Integer.parseInt(in.readLine());
             System.out.println("Broker " + brokerId + " connected to the server");
 
             sendOrder("Buy", "AAPL", 100, 150.0);
-            sendOrder("Sell", "GOOGL", 50, 100.0);
+            //sendOrder("Sell", "GOOGL", 50, 100.0);
 
             listenForResponses();
-        }catch(Exception e){
+        }catch(IOException e){
+            System.err.println("Broker failed to connect to the server");
             e.printStackTrace();
         }
     }
@@ -50,14 +48,15 @@ public class Broker {
         sb.append("55=").append(instrument).append("|");
         sb.append("38=").append(quantity).append("|");
         sb.append("44=").append(price).append("|");
-        sb.append("10=").append(calculateCheckSum(sb.toString())).append("|");
+        String message = sb.toString();
+        sb.append("10=").append(calculateCheckSum(message)).append("|");
         return sb.toString();
     }
 
     private int calculateCheckSum(String message){
         int sum = 0;
-        for(int i = 0; i < message.length(); i++){
-            sum += message.charAt(i);
+        for (char c : message.toCharArray()) {
+            sum += c;
         }
         return sum % 256;
     }
