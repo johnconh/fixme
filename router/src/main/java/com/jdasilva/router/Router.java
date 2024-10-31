@@ -41,13 +41,10 @@ public class Router {
         int idCounter = 100000;
         while (true) {
             try {
-                if(serverSocket.isClosed()){
-                    System.out.println(type + " id: " + idCounter + " socket closed.");
-                    break;
-                }
                 Socket socket = serverSocket.accept();
                 int idClient = idCounter++;
                 connections.put(idClient, socket);
+                System.out.println(type + " id: " + idClient + " connected to the server");
                 new Thread(() -> handleClient(socket, idClient, type)).start();
             } catch (IOException e) {
                 System.out.println("Error: " + type + " connection failed");
@@ -57,10 +54,10 @@ public class Router {
     }
 
     private void handleClient(Socket socket, int clientId, String type) {
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                PrintWriter writer = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()), true)) {
+        try { 
+            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            PrintWriter writer = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()), true);
             writer.println(clientId);
-            System.out.println(type + " id: " + clientId + " connected to the server");
             String message;
             while ((message = reader.readLine()) != null) {
                 System.out.println("Message received from " + type + " id " + clientId + ": " + message);
@@ -80,7 +77,6 @@ public class Router {
 
                 if(destination != null){
                     fowardMessage(message, destination);
-                    System.out.println("Message fowarded to " + destination + ": " + message);
                 } else {
                     System.out.println("Error: Destination not found");
                 }
@@ -134,10 +130,12 @@ public class Router {
     }
 
     private void fowardMessage(String message, Socket destination) {
-        try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(destination.getOutputStream()), true)) {
+        try { 
+            PrintWriter writer = new PrintWriter((destination.getOutputStream()), true); 
             writer.println(message);
             System.out.println("Message fowarded: " + message);
         } catch (Exception e) {
+            System.out.println("Error: Message could not be fowarded");
             e.printStackTrace();
         }
     }

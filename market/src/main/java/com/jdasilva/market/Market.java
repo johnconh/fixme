@@ -3,7 +3,6 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
-import java.io.IOException;
 import java.net.Socket;
 import java.util.HashMap;
 import java.util.Map;
@@ -30,19 +29,11 @@ public class Market {
     public void start() {
         try{
             socket = new Socket(host, port);
-            out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
+            out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()), true);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             marketId = Integer.parseInt(in.readLine());
             System.out.println("Market " + marketId + " connected to the server");
 
-            listenForOrders();
-        }catch(Exception e){
-            e.printStackTrace();
-        }
-    }
-
-    private void listenForOrders(){
-        try{
             String order;
             while((order = in.readLine()) != null){
                 System.out.println("Market " + marketId + " received: " + order);
@@ -50,8 +41,10 @@ public class Market {
                 out.println(response);
                 System.out.println("Market " + marketId + " sent: " + response);
             }
-        }catch(IOException e){
+        }catch(Exception e){
             e.printStackTrace();
+        }finally{
+            close();
         }
     }
 
@@ -76,7 +69,8 @@ public class Market {
         response.append("56=").append(fields.get("49")).append("|");
         response.append("55=").append(instrument).append("|");
         response.append("38=").append(quantity).append("|");
-        response.append("10=").append(calculateCheckSum(response.toString())).append("|");
+        String message = response.toString();
+        response.append("10=").append(calculateCheckSum(message)).append("|");
 
         return response.toString();
     }
