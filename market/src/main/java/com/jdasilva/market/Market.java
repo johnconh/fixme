@@ -13,7 +13,7 @@ public class Market {
     private PrintWriter out;
     private BufferedReader in;
     private int marketId;
-
+    private Handler handler;
     private static final int port = 5001;
     private static final String host = "localhost";
 
@@ -24,6 +24,13 @@ public class Market {
         inventory.put("GOOGL", 500);
         inventory.put("AMZN", 200);
         inventory.put("MSFT", 300);
+        buildChain();
+    }
+
+    private void buildChain(){
+        handler = new FIXMessageHandler();
+        Handler inventoryHandler = new InventoryHandler();
+        handler.next(inventoryHandler);
     }
 
     public void start() {
@@ -36,10 +43,7 @@ public class Market {
 
             String order;
             while((order = in.readLine()) != null){
-                System.out.println("Market " + marketId + " received: " + order);
-                String response = processOrder(order);
-                out.println(response);
-                System.out.println("Market " + marketId + " sent: " + response);
+                handler.handle(order, marketId, out, inventory);
             }
         }catch(Exception e){
             e.printStackTrace();
@@ -48,70 +52,13 @@ public class Market {
         }
     }
 
-    private String processOrder(String order){
-        Map <String, String> fields = parseFIXMessage(order);
-
-        String action = fields.get("35");
-        String instrument = fields.get("55");
-        int quantity = Integer.parseInt(fields.get("38"));
-
-        boolean executed = false;
-        if("D".equals(action)){
-            executed = executeBuyOrder(instrument, quantity);
-        } else if("F".equals(action)){
-            executed = executeSellOrder(instrument, quantity);
-        }
-
-        StringBuilder response = new StringBuilder();
-        response.append("8=FIX.4.2|");
-        response.append("35=").append(executed ? "8" : "9").append("|");
-        response.append("49=").append(marketId).append("|");
-        response.append("56=").append(fields.get("49")).append("|");
-        response.append("55=").append(instrument).append("|");
-        response.append("38=").append(quantity).append("|");
-        String message = response.toString();
-        response.append("10=").append(calculateCheckSum(message)).append("|");
-
-        return response.toString();
-    }
-
-    private Map<String, String> parseFIXMessage(String message){
-        Map<String, String> fields = new HashMap<>();
-        String[] pairs = message.split("\\|");
-        for(String pair : pairs){
-            String[] keyValue = pair.split("=");
-            fields.put(keyValue[0], keyValue[1]);
-        }
-        return fields;
-    }
-
-    private boolean executeBuyOrder(String instrument, int quantity){
-        if(inventory.containsKey(instrument) && inventory.get(instrument) >= quantity){
-            inventory.put(instrument, inventory.get(instrument) - quantity);
-            return true;
-        }
-        return false;
-    }
-
-    private boolean executeSellOrder(String instrument, int quantity){
-        inventory.put(instrument, inventory.getOrDefault(instrument, 0) + quantity);
-        return true;
-    }
-
-    private int calculateCheckSum(String message){
-        int sum = 0;
-        for(int i = 0; i < message.length(); i++){
-            sum += message.charAt(i);
-        }
-        return sum % 256;
-    }
-
     public void close(){
         try{
             if(out != null) out.close();
             if(in != null) in.close();
             if (socket != null) socket.close();
         }catch(Exception e){
+            System.out.println("Error closing the socket");
             e.printStackTrace();
         }
     }

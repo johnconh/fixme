@@ -13,6 +13,7 @@ import java.util.concurrent.CountDownLatch;
 
 public class Router {
 
+    private Handler handler;
     private Map<Integer, Socket> brokers = new HashMap<Integer, Socket>();
     private Map<Integer, Socket> markets = new HashMap<Integer, Socket>();
     private ServerSocket brokerSocket;
@@ -20,6 +21,15 @@ public class Router {
     private int brokerpot = 5000;
     private int marketport = 5001;
     private CountDownLatch latch = new CountDownLatch(1);
+
+    public Router()
+    {
+        Handler checksumHandler = new ChecksumHandler();
+        Handler fixMessageHandler = new FIXMessageHandler(this);
+
+        checksumHandler.next(fixMessageHandler);
+        this.handler = checksumHandler;
+    }
 
     public void start() {
         try{
@@ -33,6 +43,7 @@ public class Router {
             e.printStackTrace();
         } catch (InterruptedException e) {
             System.out.println("Router interrupted");
+        } finally {
             close();
         }
     }
@@ -60,26 +71,7 @@ public class Router {
             writer.println(clientId);
             String message;
             while ((message = reader.readLine()) != null) {
-                System.out.println("Message received from " + type + " id " + clientId + ": " + message);
-                if(!validateCheckshum(message)){
-                    System.out.println("Error: Invalid checksum");
-                    continue;
-                }
-                Map<String, String> fields = parseFIXMessage(message);
-                String destinationIdString = fields.get("56");
-                Socket destination;
-                if("MARKET".equals(destinationIdString)){
-                    destination = findMarketSocket();
-                } else {
-                    int destinationId = Integer.parseInt(destinationIdString);
-                    destination = getDestination(destinationId);
-                }
-
-                if(destination != null){
-                    fowardMessage(message, destination);
-                } else {
-                    System.out.println("Error: Destination not found");
-                }
+                handler.handle(message, socket, clientId, type);
             }
         } catch (Exception e) {
             System.out.println(type + " id: " + clientId + " disconnected from the server");
@@ -87,57 +79,12 @@ public class Router {
         }
     }
 
-    private Map<String, String> parseFIXMessage(String message) {
-        Map<String, String> fields = new HashMap<>();
-        String[] parts = message.split("\\|");
-        for (String part : parts) {
-            String[] field = part.split("=");
-            fields.put(field[0], field[1]);
-        }
-        return fields;
-    }
-    private boolean validateCheckshum(String message) {
-        String[] parts = message.split("\\|");
-        String checkshumFiled = parts[parts.length - 1];
-        if(checkshumFiled.startsWith("10=")){
-            int checkshum = Integer.parseInt(checkshumFiled.substring(3));
-            return calculateCheckshum(message) == checkshum;
-        }
-        return false;
+    public Map<Integer, Socket> getBrokers() {
+        return brokers;
     }
 
-    private int calculateCheckshum(String message) {
-        int checksumIndex = message.indexOf("10=");
-        String messageWithoutChecksum = (checksumIndex != -1) ? message.substring(0, checksumIndex) : message;
-        int sum = 0;
-        for (char c : messageWithoutChecksum.toCharArray()) {
-            sum += c;
-        }
-        return sum % 256;
-    }
-
-    private Socket findMarketSocket() {
-        return markets.values().stream().findAny().orElse(null);
-    }
-    
-    private Socket getDestination(int destinationId) {
-        if (brokers.containsKey(destinationId)) {
-            return brokers.get(destinationId);
-        } else if (markets.containsKey(destinationId)) {
-            return markets.get(destinationId);
-        }
-        return null;
-    }
-
-    private void fowardMessage(String message, Socket destination) {
-        try { 
-            PrintWriter writer = new PrintWriter((destination.getOutputStream()), true); 
-            writer.println(message);
-            System.out.println("Message fowarded: " + message);
-        } catch (Exception e) {
-            System.out.println("Error: Message could not be fowarded");
-            e.printStackTrace();
-        }
+    public Map<Integer, Socket> getMarkets() {
+        return markets;
     }
 
     public void close() {
