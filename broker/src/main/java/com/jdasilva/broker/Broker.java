@@ -11,9 +11,12 @@ public class Broker {
     private PrintWriter out;
     private BufferedReader in;
     private int brokerId;
+    private StringBuilder message;
+    private Handler handler;
 
     private static final int port = 5000;
     private static final String host = "localhost";
+
 
     public void start() {
         try{
@@ -34,32 +37,13 @@ public class Broker {
     }
 
     private void  sendOrder(String action, String instrument, int quantity, double price){
-        String message = formatFIXMessage(action, instrument, quantity, price);
-        out.println(message);
-        System.out.println("Broker " + brokerId + " sent: " + message);
+        message = new StringBuilder();
+        handler = new FIXMessageHandler(brokerId);
+        handler.handle(message, action, instrument, quantity, price);
+        out.println(message.toString());
+        System.out.println("Broker " + brokerId + " sent: " + message.toString());
     }
 
-    private String formatFIXMessage(String action, String instrument, int quantity, double price){
-        StringBuilder sb = new StringBuilder();
-        sb.append("8=FIX.4.2|");
-        sb.append("35=").append(action.equals("Buy") ? "D" : "F").append("|");
-        sb.append("49=").append(brokerId).append("|");
-        sb.append("56=MARKET|");
-        sb.append("55=").append(instrument).append("|");
-        sb.append("38=").append(quantity).append("|");
-        sb.append("44=").append(price).append("|");
-        String message = sb.toString();
-        sb.append("10=").append(calculateCheckSum(message)).append("|");
-        return sb.toString();
-    }
-
-    private int calculateCheckSum(String message){
-        int sum = 0;
-        for (char c : message.toCharArray()) {
-            sum += c;
-        }
-        return sum % 256;
-    }
 
     private void listenForResponses(){
         try{
