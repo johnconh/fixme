@@ -7,9 +7,16 @@ import java.io.PrintWriter;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.sql.PreparedStatement;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import com.jdasilva.database.databaseManager;
+import java.util.Random;
 
 public class Router {
 
@@ -21,9 +28,11 @@ public class Router {
     private int brokerpot = 5000;
     private int marketport = 5001;
     private CountDownLatch latch = new CountDownLatch(1);
+    private Random random = new Random();
 
     public Router()
     {
+        new databaseManager();
         Handler checksumHandler = new ChecksumHandler();
         Handler fixMessageHandler = new FIXMessageHandler(this);
 
@@ -49,11 +58,11 @@ public class Router {
     }
 
     private void listenForConnections(ServerSocket serverSocket, Map<Integer, Socket> connections, String type) {
-        int idCounter = 100000;
+    
         while (true) {
             try {
                 Socket socket = serverSocket.accept();
-                int idClient = idCounter++;
+                int idClient = 100000 + random.nextInt(900000);
                 connections.put(idClient, socket);
                 System.out.println(type + " id: " + idClient + " connected to the server");
                 new Thread(() -> handleClient(socket, idClient, type)).start();
@@ -71,12 +80,43 @@ public class Router {
             writer.println(clientId);
             String message;
             while ((message = reader.readLine()) != null) {
+                saveTransaction(clientId, type, message);
                 handler.handle(message, socket, clientId, type);
             }
         } catch (Exception e) {
             System.out.println(type + " id: " + clientId + " disconnected from the server");
             e.printStackTrace();
         }
+    }
+
+    private void saveTransaction(int clientId, String type, String message) {
+        Connection connection = null;
+        PreparedStatement statement = null;
+        ResultSet resultSet = null;
+        
+        try {
+            connection = DriverManager.getConnection(databaseManager.getURL() + databaseManager.getDB_NAME(), databaseManager.getUSER(), databaseManager.getPASSWORD());
+            String query = "INSERT INTO transactions (client_id, type, message) VALUES (?, ?, ?)";
+            statement = connection.prepareStatement(query); 
+            statement.setInt(1, clientId);
+            statement.setString(2, type);
+            statement.setString(3, message);
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (resultSet != null)
+                    resultSet.close();
+                if (statement != null)
+                    statement.close();
+                if (connection != null)
+                    connection.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+      
     }
 
     public Map<Integer, Socket> getBrokers() {

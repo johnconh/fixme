@@ -68,8 +68,10 @@ public class FIXMessageHandler extends BaseHandler {
     }
 
     private int calculateCheckSum(String message){
+        int startIndex = message.indexOf("|") + 1;
+        String messageToCheck = message.substring(startIndex);
         int sum = 0;
-        for(char c : message.toCharArray()){
+        for(char c : messageToCheck.toCharArray()){
             sum += c;
         }
         return sum % 256;

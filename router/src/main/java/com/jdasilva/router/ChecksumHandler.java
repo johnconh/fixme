@@ -22,8 +22,9 @@ public class ChecksumHandler  extends BaseHandler {
     }
 
     private int calculateCheckshum(String message) {
-        int checksumIndex = message.indexOf("10=");
-        String messageWithoutChecksum = (checksumIndex != -1) ? message.substring(0, checksumIndex) : message;
+        String messageWithoutHeader = message.startsWith("8=FIX.4.2|") ? message.substring(10) : message;
+        int checksumIndex = messageWithoutHeader.indexOf("10=");
+        String messageWithoutChecksum = (checksumIndex != -1) ? messageWithoutHeader.substring(0, checksumIndex) : messageWithoutHeader;
         int sum = 0;
         for (char c : messageWithoutChecksum.toCharArray()) {
             sum += c;
