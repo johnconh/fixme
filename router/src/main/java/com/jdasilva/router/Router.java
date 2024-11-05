@@ -176,8 +176,14 @@ public class Router {
         for(Map<String, Object> transaction : faliedTransactions){
             int clientId = (int) transaction.get("client_id");
             String message = (String) transaction.get("message");
-            handler.handle(message, type.equals("Broker") ? brokers.get(clientId) : markets.get(clientId), clientId, type);
-            updateTransaction((int) transaction.get("id"), "COMPLETED");
+            Socket socket = type.equals("Broker") ? markets.get(clientId) : brokers.get(clientId);
+            try{
+                handler.handle(message, socket, clientId, type);
+                updateTransaction((int) transaction.get("id"), "COMPLETED");
+            }catch (Exception e) {
+                System.out.println("Error: " + type + " id: " + clientId + " could not be processed");
+                updateTransaction((int) transaction.get("id"), "FAILED");
+            }
         }
     }
 
