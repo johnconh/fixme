@@ -68,7 +68,7 @@ public class Router {
                 int idClient = 100000 + random.nextInt(900000);
                 connections.put(idClient, socket);
                 System.out.println(type + " id: " + idClient + " connected to the server");
-                new Thread(() -> retryFailedTransactions(type)).start();
+                new Thread(() -> retryFailedTransactions(socket, idClient, type)).start();
                 new Thread(() -> handleClient(socket, idClient, type)).start();
             } catch (IOException e) {
                 System.out.println("Error: " + type + " connection failed");
@@ -169,14 +169,13 @@ public class Router {
         }
     }
 
-    private void retryFailedTransactions(String type) {
+    private void retryFailedTransactions(Socket socket, int idClient, String type) {
         List <Map<String, Object>> faliedTransactions = databaseManager.getFailedTransactions(type);
         if (faliedTransactions.isEmpty()) {return;}
         System.out.println("Retrying failed transactions for " + type);
         for(Map<String, Object> transaction : faliedTransactions){
             int clientId = (int) transaction.get("client_id");
             String message = (String) transaction.get("message");
-            Socket socket = type.equals("Broker") ? markets.get(clientId) : brokers.get(clientId);
             try{
                 handler.handle(message, socket, clientId, type);
                 updateTransaction((int) transaction.get("id"), "COMPLETED");
