@@ -5,7 +5,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 
-
 public class FIXMessageHandler extends BaseHandler {
     private Router router;
 
@@ -26,9 +25,9 @@ public class FIXMessageHandler extends BaseHandler {
         }
 
         if(destination != null){
-            fowardMessage(message, destination);
+            fowardMessage(message, destination, clientId);
         } else {
-            System.out.println("Error: Destination not found");
+            throw new RuntimeException("Destination not found");
         }
         super.handle(message, socket, clientId, type);
     }
@@ -52,14 +51,13 @@ public class FIXMessageHandler extends BaseHandler {
         return null;
     }
 
-    private void fowardMessage(String message, Socket destination) {
+    private void fowardMessage(String message, Socket destination, int clientId) {
         try { 
             PrintWriter writer = new PrintWriter((destination.getOutputStream()), true); 
             writer.println(message);
             System.out.println("Message fowarded: " + message);
         } catch (Exception e) {
             System.out.println("Error: Message could not be fowarded");
-            e.printStackTrace();
         }
     }
 

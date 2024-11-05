@@ -7,7 +7,9 @@ import java.io.PrintWriter;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.sql.PreparedStatement;
+import java.sql.Statement;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -17,6 +19,7 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import com.jdasilva.database.databaseManager;
 import java.util.Random;
+import java.util.List;
 
 public class Router {
 
@@ -65,6 +68,7 @@ public class Router {
                 int idClient = 100000 + random.nextInt(900000);
                 connections.put(idClient, socket);
                 System.out.println(type + " id: " + idClient + " connected to the server");
+                new Thread(() -> retryFailedTransactions(type)).start();
                 new Thread(() -> handleClient(socket, idClient, type)).start();
             } catch (IOException e) {
                 System.out.println("Error: " + type + " connection failed");
@@ -74,34 +78,55 @@ public class Router {
     }
 
     private void handleClient(Socket socket, int clientId, String type) {
-        try { 
+        try {
+            socket.setSoTimeout(60000);
             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             PrintWriter writer = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()), true);
             writer.println(clientId);
             String message;
             while ((message = reader.readLine()) != null) {
-                saveTransaction(clientId, type, message);
-                handler.handle(message, socket, clientId, type);
+                int  transactionID = saveTransaction(clientId, type, message, "IN_PROGRESS");
+                try{
+                    handler.handle(message, socket, clientId, type);
+                    updateTransaction(transactionID, "COMPLETED");
+                } catch (Exception e) {
+                    System.out.println("Error: " + type + " id: " + clientId + " could not be processed");
+                    updateTransaction(transactionID, "FAILED");
+                }
             }
-        } catch (Exception e) {
+        } catch (SocketTimeoutException e) {
+            System.out.println(type + " id: " + clientId + " has timed out and may be disconnected.");
+        } catch (IOException e) {
             System.out.println(type + " id: " + clientId + " disconnected from the server");
             e.printStackTrace();
+        } finally {
+            try {
+                socket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
-    private void saveTransaction(int clientId, String type, String message) {
+    private int saveTransaction(int clientId, String type, String message, String status) {
         Connection connection = null;
         PreparedStatement statement = null;
         ResultSet resultSet = null;
         
         try {
             connection = DriverManager.getConnection(databaseManager.getURL() + databaseManager.getDB_NAME(), databaseManager.getUSER(), databaseManager.getPASSWORD());
-            String query = "INSERT INTO transactions (client_id, type, message) VALUES (?, ?, ?)";
-            statement = connection.prepareStatement(query); 
+            String query = "INSERT INTO transactions (client_id, type, message, status) VALUES (?, ?, ?, ?)";
+            statement = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS); 
             statement.setInt(1, clientId);
             statement.setString(2, type);
             statement.setString(3, message);
+            statement.setString(4, status);
             statement.executeUpdate();
+
+            resultSet = statement.getGeneratedKeys();
+            if (resultSet.next()) {
+                return resultSet.getInt(1);
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         } finally {
@@ -116,7 +141,44 @@ public class Router {
                 e.printStackTrace();
             }
         }
-      
+      return -1;
+    }
+
+    public void updateTransaction (int transactionID, String status) {
+        Connection connection = null;
+        PreparedStatement statement = null;
+        
+        try {
+            connection = DriverManager.getConnection(databaseManager.getURL() + databaseManager.getDB_NAME(), databaseManager.getUSER(), databaseManager.getPASSWORD());
+            String query = "UPDATE transactions SET status = ? WHERE id = ?";
+            statement = connection.prepareStatement(query);
+            statement.setString(1, status);
+            statement.setInt(2, transactionID);
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (statement != null)
+                    statement.close();
+                if (connection != null)
+                    connection.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private void retryFailedTransactions(String type) {
+        List <Map<String, Object>> faliedTransactions = databaseManager.getFailedTransactions(type);
+        if (faliedTransactions.isEmpty()) {return;}
+        System.out.println("Retrying failed transactions for " + type);
+        for(Map<String, Object> transaction : faliedTransactions){
+            int clientId = (int) transaction.get("client_id");
+            String message = (String) transaction.get("message");
+            handler.handle(message, type.equals("Broker") ? brokers.get(clientId) : markets.get(clientId), clientId, type);
+            updateTransaction((int) transaction.get("id"), "COMPLETED");
+        }
     }
 
     public Map<Integer, Socket> getBrokers() {

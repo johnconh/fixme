@@ -3,9 +3,13 @@ package com.jdasilva.database;
 import io.github.cdimascio.dotenv.Dotenv;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 public class databaseManager {
 
@@ -54,7 +58,8 @@ public class databaseManager {
                 "id SERIAL PRIMARY KEY," + 
                 "client_id INT NOT NULL," +
                 "type VARCHAR(50) NOT NULL," + 
-                "message VARCHAR(255) NOT NULL)");
+                "message VARCHAR(255) NOT NULL," +
+                "status TEXT NOT NULL DEFAULT 'PENDING')");
         } catch (SQLException e) {
             e.printStackTrace();
         } finally {
@@ -67,6 +72,45 @@ public class databaseManager {
                 e.printStackTrace();
             }
         }
+    }
+
+    public static List<Map<String, Object>> getFailedTransactions(String type) {
+        List<Map<String, Object>> transactions = new ArrayList<>();
+        Connection connection = null;
+        PreparedStatement statement = null;
+        ResultSet resultSet = null;
+
+        try{
+            connection = DriverManager.getConnection(URL + DB_NAME, USER, PASSWORD);
+            String query = "SELECT * FROM transactions WHERE status = 'FAILED' AND type = ?";
+            statement = connection.prepareStatement(query);
+            statement.setString(1, type);
+            resultSet = statement.executeQuery();
+
+            while(resultSet.next()){
+                transactions.add(Map.of(
+                    "id", resultSet.getInt("id"),
+                    "client_id", resultSet.getInt("client_id"),
+                    "type", resultSet.getString("type"),
+                    "message", resultSet.getString("message"),
+                    "status", resultSet.getString("status")
+                ));
+            }  
+        }catch(SQLException e){
+            e.printStackTrace();
+        }finally{
+            try{
+                if(resultSet != null)
+                    resultSet.close();
+                if(statement != null)
+                    statement.close();
+                if(connection != null)
+                    connection.close();
+            }catch(SQLException e){
+                e.printStackTrace();
+            }
+        }
+        return transactions;
     }
 
     public static String getURL() {

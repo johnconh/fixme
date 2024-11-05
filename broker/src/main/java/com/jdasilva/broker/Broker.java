@@ -27,7 +27,7 @@ public class Broker {
             System.out.println("Broker " + brokerId + " connected to the server");
 
             sendOrder("Buy", "AAPL", 100, 150.0);
-            //sendOrder("Sell", "GOOGL", 50, 100.0);
+            sendOrder("Sell", "GOOGL", 50, 100.0);
 
             listenForResponses();
         }catch(IOException e){
