@@ -41,7 +41,7 @@ public class Broker {
         handler = new FIXMessageHandler(brokerId);
         handler.handle(message, action, instrument, quantity, price);
         out.println(message.toString());
-        System.out.println("Broker " + brokerId + " sent: " + message.toString());
+        System.out.println("Message sent: " + message.toString());
     }
 
 
@@ -49,7 +49,7 @@ public class Broker {
         try{
             String response;
             while((response = in.readLine()) != null){
-                System.out.println("Market received: " + response);
+                System.out.println("Message received: " + response);
             }
         }catch(Exception e){
             e.printStackTrace();

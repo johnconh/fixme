@@ -1,5 +1,8 @@
 package com.jdasilva.broker;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
 public class FIXMessageHandler extends BaseHandler {
 
     private int brokerId;
@@ -17,6 +20,8 @@ public class FIXMessageHandler extends BaseHandler {
         message.append("55=").append(instrument).append("|");
         message.append("38=").append(quantity).append("|");
         message.append("44=").append(price).append("|");
+        String timestamp = new SimpleDateFormat("yyyyMMdd-HH:mm:ss.SSS").format(new Date());
+        message.append("52=").append(timestamp).append("|");
         String checksum = calculateChecksum(message.toString());
         message.append("10=").append(checksum).append("|");
         super.handle(message, action, instrument, quantity, price);

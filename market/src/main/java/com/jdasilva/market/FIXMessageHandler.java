@@ -2,14 +2,16 @@ package com.jdasilva.market;
 import java.io.PrintWriter;
 import java.util.Map;
 import java.util.HashMap;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 public class FIXMessageHandler extends BaseHandler {
     @Override
     public void handle(String message, int clientId, PrintWriter out, Map<String, Integer> inventory) {
-        System.out.println("Market id: " + clientId + " received: " + message);
+        System.out.println("Message received: " + message);
         String response = processOrder(message, clientId, inventory);
         out.println(response);
-        System.out.println("Market id: " + clientId + " sent: " + response);
+        System.out.println("Message sent: " + response);
     }
 
     private String processOrder(String order, int clientId, Map<String, Integer> inventory){
@@ -18,6 +20,7 @@ public class FIXMessageHandler extends BaseHandler {
         String action = fields.get("35");
         String instrument = fields.get("55");
         int quantity = Integer.parseInt(fields.get("38"));
+        double price = Double.parseDouble(fields.get("44"));
         int brokerId = Integer.parseInt(fields.get("49"));
 
         boolean executed = false;
@@ -27,7 +30,7 @@ public class FIXMessageHandler extends BaseHandler {
             executed = executeSellOrder(instrument, quantity, inventory);
         }
 
-        return createFIXMessage(executed, instrument, quantity, clientId, brokerId);
+        return createFIXMessage(executed, instrument, quantity, price, clientId, brokerId);
     }
 
     private Map<String, String> parseFIXMessage(String order){
@@ -53,7 +56,7 @@ public class FIXMessageHandler extends BaseHandler {
         return true;
     }
 
-    private String createFIXMessage(boolean executed, String instrument, int quantity, int clientId, int brokerId){
+    private String createFIXMessage(boolean executed, String instrument, int quantity, double price, int clientId, int brokerId){
         StringBuilder response = new StringBuilder();
         response.append("8=FIX.4.2|");
         response.append("35=").append(executed ? "8" : "9").append("|");
@@ -61,6 +64,9 @@ public class FIXMessageHandler extends BaseHandler {
         response.append("56=").append(brokerId).append("|");
         response.append("55=").append(instrument).append("|");
         response.append("38=").append(quantity).append("|");
+        response.append("44=").append(price).append("|");
+        String timestamp = new SimpleDateFormat("yyyyMMdd-HH:mm:ss.SSS").format(new Date());
+        response.append("52=").append(timestamp).append("|");
         String message = response.toString();
         response.append("10=").append(calculateCheckSum(message)).append("|");
 
