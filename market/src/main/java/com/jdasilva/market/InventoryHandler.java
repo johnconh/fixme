@@ -1,12 +1,12 @@
 package com.jdasilva.market;
-import java.io.PrintWriter;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.HashMap;
 
 public class InventoryHandler extends BaseHandler {
 
     @Override
-    public void handle(String message, int clientId, PrintWriter out, Map<String, Integer> inventory) {
+    public void handle(String message, int clientId, Consumer<String> out, Map<String, Integer> inventory) {
         Map <String, String> fields = parseFIXMessage(message);
         String instrument = fields.get("55");
         int quantity = Integer.parseInt(fields.get("38"));

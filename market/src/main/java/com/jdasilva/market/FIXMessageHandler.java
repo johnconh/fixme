@@ -1,16 +1,15 @@
 package com.jdasilva.market;
-import java.io.PrintWriter;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.HashMap;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
 public class FIXMessageHandler extends BaseHandler {
     @Override
-    public void handle(String message, int clientId, PrintWriter out, Map<String, Integer> inventory) {
-        System.out.println("Message received: " + message);
+    public void handle(String message, int clientId, Consumer<String> out, Map<String, Integer> inventory) {
         String response = processOrder(message, clientId, inventory);
-        out.println(response);
+        out.accept(response);
         System.out.println("Message sent: " + response);
     }
 

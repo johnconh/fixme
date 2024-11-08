@@ -1,5 +1,5 @@
 package com.jdasilva.router;
-import java.net.Socket;
+import java.nio.channels.SocketChannel;
 
 public abstract class BaseHandler implements Handler {
     private Handler next;
@@ -10,7 +10,7 @@ public abstract class BaseHandler implements Handler {
     }
 
     @Override
-    public void handle(String message, Socket socket, int clientId, String type) {
+    public void handle(String message, SocketChannel socket, int clientId, String type) throws Exception {
         if (next != null) {
             System.out.println(type + " id: " + clientId + " received: " + message);
             next.handle(message, socket, clientId, type);

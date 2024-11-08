@@ -1,38 +1,45 @@
 package com.jdasilva.broker;
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
-import java.net.Socket;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
+import java.nio.charset.StandardCharsets;
 
 public class Broker {
-    private Socket socket;
-    private PrintWriter out;
-    private BufferedReader in;
+    private SocketChannel socket;
     private int brokerId;
     private StringBuilder message;
     private Handler handler;
-
     private static final int port = 5000;
     private static final String host = "localhost";
 
-
     public void start() {
         try{
-            socket = new Socket(host, port);
-            out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()), true);
-            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            brokerId = Integer.parseInt(in.readLine());
-            System.out.println("Broker " + brokerId + " connected to the server");
+            try {
+                socket = SocketChannel.open(new InetSocketAddress(host, port));
+                socket.configureBlocking(false);
+                ByteBuffer buffer = ByteBuffer.allocate(256);
+                while (socket.read(buffer) <= 0) {
+                    Thread.sleep(1000);
+                }
+                socket.read(buffer);
+                buffer.flip();
+                brokerId = Integer.parseInt(StandardCharsets.UTF_8.decode(buffer).toString().trim());
+                System.out.println("Broker " + brokerId + " connected to the server");
 
-            sendOrder("Buy", "AAPL", 100, 150.0);
-            sendOrder("Sell", "GOOGL", 50, 100.0);
+                sendOrder("Buy", "AAPL", 100, 150.0);
+                //sendOrder("Sell", "GOOGL", 50, 100.0);
 
-            listenForResponses();
-        }catch(IOException e){
+                listenForResponses();
+            } catch (IOException e) {
+                System.err.println("Broker failed to connect to the server");
+                e.printStackTrace();
+            }
+        }catch(Exception e){
             System.err.println("Broker failed to connect to the server");
             e.printStackTrace();
+        } finally {
+            close();
         }
     }
 
@@ -40,29 +47,42 @@ public class Broker {
         message = new StringBuilder();
         handler = new FIXMessageHandler(brokerId);
         handler.handle(message, action, instrument, quantity, price);
-        out.println(message.toString());
-        System.out.println("Message sent: " + message.toString());
+        try{
+            ByteBuffer buffer = ByteBuffer.wrap(message.toString().getBytes(StandardCharsets.UTF_8));
+            while (buffer.hasRemaining()) {
+                socket.write(buffer);
+            }
+            System.out.println("Message sent: " + message);
+        } catch (IOException e) {
+            System.err.println("Broker failed to send the message");
+            e.printStackTrace();
+        }
     }
 
-
     private void listenForResponses(){
+        ByteBuffer buffer = ByteBuffer.allocate(256);
         try{
-            String response;
-            while((response = in.readLine()) != null){
-                System.out.println("Message received: " + response);
+            while(socket.read(buffer) != -1){
+                buffer.flip();
+                String response = StandardCharsets.UTF_8.decode(buffer).toString().trim();
+                buffer.clear();
+                if(!response.isEmpty()){
+                    System.out.println("Message received: " + response);
+                }
             }
         }catch(Exception e){
+            System.err.println("Broker failed to receive the message");
             e.printStackTrace();
         }
     }
 
     public void close(){
         try{
-            if(out != null) out.close();
-            if(in != null) in.close();
-            if (socket != null) socket.close();
-        }catch(Exception e){
+            socket.close();
+            System.out.println("Broker " + brokerId + " disconnected from the server");
+        }catch(IOException e){
+            System.err.println("Broker failed to disconnect from the server");
             e.printStackTrace();
-        }
+        }    
     }
 }

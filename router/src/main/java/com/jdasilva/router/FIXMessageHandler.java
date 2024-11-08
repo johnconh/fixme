@@ -1,6 +1,8 @@
 package com.jdasilva.router;
-import java.io.PrintWriter;
-import java.net.Socket;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -13,10 +15,10 @@ public class FIXMessageHandler extends BaseHandler {
     }
 
     @Override
-    public void handle(String message, Socket socket, int clientId, String type) {
+    public void handle(String message, SocketChannel socket, int clientId, String type) throws Exception {
         Map<String, String> fields = parseFIXMessage(message);
         String destinationIdString = fields.get("56");
-        Socket destination;
+        SocketChannel destination;
         if("MARKET".equals(destinationIdString)){
             destination = findMarketSocket();
         } else {
@@ -27,7 +29,7 @@ public class FIXMessageHandler extends BaseHandler {
         if(destination != null){
             fowardMessage(message, destination, clientId);
         } else {
-            throw new RuntimeException("Destination not found");
+            throw new IOException("Destination not found");
         }
         super.handle(message, socket, clientId, type);
     }
@@ -42,7 +44,7 @@ public class FIXMessageHandler extends BaseHandler {
         return fields;
     }
 
-    private Socket getDestination(int destinationId) {
+    private SocketChannel getDestination(int destinationId) {
         if (router.getBrokers().containsKey(destinationId)) {
             return router.getBrokers().get(destinationId);
         } else if (router.getMarkets().containsKey(destinationId)) {
@@ -51,17 +53,15 @@ public class FIXMessageHandler extends BaseHandler {
         return null;
     }
 
-    private void fowardMessage(String message, Socket destination, int clientId) {
-        try { 
-            PrintWriter writer = new PrintWriter((destination.getOutputStream()), true); 
-            writer.println(message);
-            System.out.println("Message fowarded: " + message);
-        } catch (Exception e) {
-            System.out.println("Error: Message could not be fowarded");
+    private void fowardMessage(String message, SocketChannel destination, int clientId) throws Exception  {
+        ByteBuffer buffer = ByteBuffer.wrap(message.getBytes(StandardCharsets.UTF_8)); 
+        while (buffer.hasRemaining()) {
+            destination.write(buffer);
         }
+        System.out.println("Message fowarded: " + message);
     }
 
-    private Socket findMarketSocket() {
+    private SocketChannel findMarketSocket() {
         return router.getMarkets().values().stream().findAny().orElse(null);
     }
     

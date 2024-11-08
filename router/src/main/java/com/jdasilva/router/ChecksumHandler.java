@@ -1,9 +1,9 @@
 package com.jdasilva.router;
-import java.net.Socket;
+import java.nio.channels.SocketChannel;
 
 public class ChecksumHandler  extends BaseHandler {
     @Override
-    public void handle(String message, Socket socket, int clientId, String type) {
+    public void handle(String message, SocketChannel socket, int clientId, String type) throws Exception {
         if(!validateCheckshum(message)){
             System.out.println("Error: Invalid checksum");
             return;

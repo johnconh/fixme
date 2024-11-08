@@ -1,8 +1,8 @@
 package com.jdasilva.router;
 
-import java.net.Socket;
+import java.nio.channels.SocketChannel;
 
 public interface Handler {
     void next(Handler handler);
-    void handle(String message, Socket socket, int clientId, String type);
+    void handle(String message, SocketChannel socket, int clientId, String type) throws Exception;
 }

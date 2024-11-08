@@ -1,13 +1,11 @@
 package com.jdasilva.router;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
 import java.io.IOException;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.SocketTimeoutException;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
+import java.nio.charset.StandardCharsets;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.sql.Connection;
@@ -17,6 +15,9 @@ import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 import com.jdasilva.database.databaseManager;
 import java.util.Random;
 import java.util.List;
@@ -24,14 +25,15 @@ import java.util.List;
 public class Router {
 
     private Handler handler;
-    private Map<Integer, Socket> brokers = new HashMap<Integer, Socket>();
-    private Map<Integer, Socket> markets = new HashMap<Integer, Socket>();
-    private ServerSocket brokerSocket;
-    private ServerSocket marketSocket;
+    private Map<Integer, SocketChannel> brokers = new HashMap<>();
+    private Map<Integer, SocketChannel> markets = new HashMap<>();
+    private ServerSocketChannel brokerSocket;
+    private ServerSocketChannel marketSocket;
     private int brokerpot = 5000;
     private int marketport = 5001;
     private CountDownLatch latch = new CountDownLatch(1);
     private Random random = new Random();
+    private ExecutorService executorService = Executors.newFixedThreadPool(10);
 
     public Router()
     {
@@ -45,47 +47,79 @@ public class Router {
 
     public void start() {
         try{
-            brokerSocket = new ServerSocket(brokerpot);
-            marketSocket = new ServerSocket(marketport);
+            brokerSocket = ServerSocketChannel.open();
+            brokerSocket.bind(new InetSocketAddress(brokerpot));
+            marketSocket = ServerSocketChannel.open();
+            marketSocket.bind(new InetSocketAddress(marketport));
             System.out.println("Router started on port " + brokerpot + " and " + marketport);
-            new Thread(() -> listenForConnections(brokerSocket, brokers, "Broker")).start();
-            new Thread(() -> listenForConnections(marketSocket, markets, "Market")).start();
+            executorService.submit(() -> listenForConnections(brokerSocket, brokers, "Broker"));
+            executorService.submit(() -> listenForConnections(marketSocket, markets, "Market"));
             latch.await();
         } catch (IOException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {
             System.out.println("Router interrupted");
         } finally {
+            executorService.shutdown();
             close();
         }
     }
 
-    private void listenForConnections(ServerSocket serverSocket, Map<Integer, Socket> connections, String type) {
+    private void listenForConnections(ServerSocketChannel serverSocket, Map<Integer, SocketChannel> connections, String type) {
     
         while (true) {
             try {
-                Socket socket = serverSocket.accept();
+                SocketChannel socket = serverSocket.accept();
+                socket.configureBlocking(false);
                 int idClient = 100000 + random.nextInt(900000);
                 connections.put(idClient, socket);
                 System.out.println(type + " id: " + idClient + " connected to the server");
-                new Thread(() -> retryFailedTransactions(socket, idClient, type)).start();
-                new Thread(() -> handleClient(socket, idClient, type)).start();
-            } catch (IOException e) {
+                ByteBuffer buffer = ByteBuffer.allocate(256);
+                buffer.put(String.valueOf(idClient).getBytes(StandardCharsets.UTF_8));
+                buffer.flip();
+                socket.write(buffer);
+                executorService.submit(() -> retryFailedTransactions(socket, idClient, type));
+                executorService.submit(() -> handleClient(socket, idClient, type));
+            } catch (Exception e) {
                 System.out.println("Error: " + type + " connection failed");
                 e.printStackTrace();
-            } 
+            }
         }
     }
 
-    private void handleClient(Socket socket, int clientId, String type) {
+    private void handleClient(SocketChannel socket, int clientId, String type) {
         try {
-            socket.setSoTimeout(60000);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            PrintWriter writer = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()), true);
-            writer.println(clientId);
-            String message;
-            while ((message = reader.readLine()) != null) {
+            ByteBuffer buffer = ByteBuffer.allocate(256);
+            while (true) {
+                if (!socket.isOpen()) {
+                    break;
+                }
+
+                int read = socket.read(buffer);
+                if (read == -1) {
+                    System.out.println(type + " id: " + clientId + " disconnected from the server");
+                    if("Broker".equals(type)){
+                        brokers.remove(clientId);
+                    } else {
+                        markets.remove(clientId);
+                    }
+                    break;
+                }
+
+                if(read == 0) {
+                    continue;
+                }
+
+                buffer.flip();
+                String message = StandardCharsets.UTF_8.decode(buffer).toString();
+                buffer.clear();
+
+                if (message.isEmpty()) {
+                    continue;
+                }
+
                 int  transactionID = saveTransaction(clientId, type, message, "IN_PROGRESS");
+                
                 try{
                     handler.handle(message, socket, clientId, type);
                     updateTransaction(transactionID, "COMPLETED");
@@ -94,8 +128,6 @@ public class Router {
                     updateTransaction(transactionID, "FAILED");
                 }
             }
-        } catch (SocketTimeoutException e) {
-            System.out.println(type + " id: " + clientId + " has timed out and may be disconnected.");
         } catch (IOException e) {
             System.out.println(type + " id: " + clientId + " disconnected from the server");
             e.printStackTrace();
@@ -169,7 +201,7 @@ public class Router {
         }
     }
 
-    private void retryFailedTransactions(Socket socket, int idClient, String type) {
+    private void retryFailedTransactions(SocketChannel socket, int idClient, String type) {
         List <Map<String, Object>> faliedTransactions = databaseManager.getFailedTransactions(type);
         if (faliedTransactions.isEmpty()) {return;}
         System.out.println("Retrying failed transactions for " + type);
@@ -186,11 +218,11 @@ public class Router {
         }
     }
 
-    public Map<Integer, Socket> getBrokers() {
+    public Map<Integer, SocketChannel> getBrokers() {
         return brokers;
     }
 
-    public Map<Integer, Socket> getMarkets() {
+    public Map<Integer, SocketChannel> getMarkets() {
         return markets;
     }
 
@@ -210,10 +242,10 @@ public class Router {
             }
         });
         try {
-            if (brokerSocket != null && !brokerSocket.isClosed()) {
+            if (brokerSocket != null && !brokerSocket.isOpen()) {
                 brokerSocket.close();
             }
-            if (marketSocket != null && !marketSocket.isClosed()) {
+            if (marketSocket != null && !marketSocket.isOpen()) {
                 marketSocket.close();
             }
         } catch (IOException e) {
