@@ -1,6 +1,9 @@
 all:
 	docker compose up -d
 
+run:
+	@./launch.sh
+
 down:
 	docker compose down
 
