@@ -88,6 +88,7 @@ public class Broker {
             }
         }
     }
+    
     private void  sendOrder(String action, String instrument, int quantity, double price){
         message = new StringBuilder();
         handler = new FIXMessageHandler(brokerId);
