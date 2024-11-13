@@ -114,6 +114,7 @@ public class Broker {
                 if(!response.isEmpty()){
                     System.out.println("Message received: " + response);
                 }
+                Thread.sleep(1000);
             }
         }catch(Exception e){
             System.err.println("Broker failed to receive the message");
