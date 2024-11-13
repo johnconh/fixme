@@ -123,7 +123,7 @@ public class Broker {
     }
 
     public void close(){
-        //scanner.close();
+        scanner.close();
         try{
             socket.close();
             System.out.println("Broker " + brokerId + " disconnected from the server");
