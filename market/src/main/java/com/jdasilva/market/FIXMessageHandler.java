@@ -66,8 +66,10 @@ public class FIXMessageHandler extends BaseHandler {
         double price = prices.get(instrument);
         if(increase){
             prices.put(instrument, price * 1.1);
+            System.out.println("==== Price of " + instrument + " increased to " + prices.get(instrument) + " ====");
         }else{
             prices.put(instrument, price * 0.9);
+            System.out.println("=== Price of " + instrument + " decreased to " + prices.get(instrument) + " ====");
         }
     }
     private String createFIXMessage(boolean executed, String instrument, int quantity, double price, int clientId, int brokerId){
