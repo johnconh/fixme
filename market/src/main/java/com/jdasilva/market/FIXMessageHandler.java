@@ -44,8 +44,8 @@ public class FIXMessageHandler extends BaseHandler {
 
     private boolean executeBuyOrder(String instrument, int quantity, Map<String, Integer> inventory, Map<String, Double> prices, double brokerPrice){
         if(inventory.containsKey(instrument)){
-            double marketPrice = prices.get(instrument);
-            if(marketPrice < brokerPrice && inventory.get(instrument) < quantity){
+            if(prices.get(instrument) > brokerPrice || inventory.get(instrument) < quantity){
+                System.err.println("Price of " + instrument + " is higher than the broker price or insufficient quantity");
                 return false;
             }
             inventory.put(instrument, inventory.get(instrument) - quantity);
@@ -56,8 +56,12 @@ public class FIXMessageHandler extends BaseHandler {
     }
 
     private boolean executeSellOrder(String instrument, int quantity, Map<String, Integer> inventory, Map<String, Double> prices, double brokerPrice){
+        if(prices.containsKey(instrument) && prices.get(instrument) > brokerPrice){
+            System.err.println("Price of " + instrument + " is lower than the broker price");
+            return false;
+        }
         inventory.put(instrument, inventory.getOrDefault(instrument, 0) + quantity);
-        prices.put(instrument, prices.getOrDefault(instrument, null) + brokerPrice);
+        prices.put(instrument, brokerPrice);
         adjustprice(instrument, prices, false);
         return true;
     }

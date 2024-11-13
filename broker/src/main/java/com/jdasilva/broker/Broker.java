@@ -32,11 +32,11 @@ public class Broker {
                 brokerId = Integer.parseInt(StandardCharsets.UTF_8.decode(buffer).toString().trim());
                 System.out.println("Broker " + brokerId + " connected to the server");
 
-                sendOrder("Buy", "AAPL", 100, 150.0);
-                sendOrder("Sell", "GOOGL", 50, 100.0);
-                listenForResponses();
-                //executorService.submit(this::listenForResponses);
-                //processOrders();
+                // sendOrder("Buy", "AAPL", 100, 150.0);
+                // sendOrder("Sell", "GOOGL", 50, 100.0);
+                // listenForResponses();
+                executorService.submit(this::listenForResponses);
+                processOrders();
 
             } catch (IOException e) {
                 System.err.println("Broker failed to connect to the server");
