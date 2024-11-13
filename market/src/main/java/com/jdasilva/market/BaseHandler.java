@@ -11,10 +11,10 @@ public abstract class BaseHandler implements Handler {
     }
 
     @Override
-    public void handle(String message, int clientId, Consumer<String> out,  Map<String, Integer> inventory) {
+    public void handle(String message, int clientId, Consumer<String> out,  Map<String, Integer> inventory, Map<String, Double> prices) {
         if (next != null) {
             System.out.println("Market id: " + clientId + " received: " + message);
-            next.handle(message, clientId, out, inventory);
+            next.handle(message, clientId, out, inventory, prices);
         }
     }
 }

@@ -7,29 +7,29 @@ import java.util.Date;
 
 public class FIXMessageHandler extends BaseHandler {
     @Override
-    public void handle(String message, int clientId, Consumer<String> out, Map<String, Integer> inventory) {
-        String response = processOrder(message, clientId, inventory);
+    public void handle(String message, int clientId, Consumer<String> out, Map<String, Integer> inventory, Map<String, Double> prices) {
+        String response = processOrder(message, clientId, inventory, prices);
         out.accept(response);
         System.out.println("Message sent: " + response);
     }
 
-    private String processOrder(String order, int clientId, Map<String, Integer> inventory){
+    private String processOrder(String order, int clientId, Map<String, Integer> inventory, Map<String, Double> prices){
         Map <String, String> fields = parseFIXMessage(order);
 
         String action = fields.get("35");
         String instrument = fields.get("55");
         int quantity = Integer.parseInt(fields.get("38"));
-        double price = Double.parseDouble(fields.get("44"));
+        double brokerPrice = Double.parseDouble(fields.get("44"));
         int brokerId = Integer.parseInt(fields.get("49"));
 
         boolean executed = false;
         if("D".equals(action)){
-            executed = executeBuyOrder(instrument, quantity, inventory);
+            executed = executeBuyOrder(instrument, quantity, inventory, prices, brokerPrice);
         }else if("F".equals(action)){
-            executed = executeSellOrder(instrument, quantity, inventory);
+            executed = executeSellOrder(instrument, quantity, inventory, prices, brokerPrice);
         }
 
-        return createFIXMessage(executed, instrument, quantity, price, clientId, brokerId);
+        return createFIXMessage(executed, instrument, quantity, brokerPrice, clientId, brokerId);
     }
 
     private Map<String, String> parseFIXMessage(String order){
@@ -42,19 +42,34 @@ public class FIXMessageHandler extends BaseHandler {
         return fields;
     }
 
-    private boolean executeBuyOrder(String instrument, int quantity, Map<String, Integer> inventory){
-        if(inventory.containsKey(instrument) && inventory.get(instrument) >= quantity){
+    private boolean executeBuyOrder(String instrument, int quantity, Map<String, Integer> inventory, Map<String, Double> prices, double brokerPrice){
+        if(inventory.containsKey(instrument)){
+            double marketPrice = prices.get(instrument);
+            if(marketPrice < brokerPrice && inventory.get(instrument) < quantity){
+                return false;
+            }
             inventory.put(instrument, inventory.get(instrument) - quantity);
+            adjustprice(instrument, prices, true);
             return true;
         }
         return false;
     }
 
-    private boolean executeSellOrder(String instrument, int quantity, Map<String, Integer> inventory){
+    private boolean executeSellOrder(String instrument, int quantity, Map<String, Integer> inventory, Map<String, Double> prices, double brokerPrice){
         inventory.put(instrument, inventory.getOrDefault(instrument, 0) + quantity);
+        prices.put(instrument, prices.getOrDefault(instrument, null) + brokerPrice);
+        adjustprice(instrument, prices, false);
         return true;
     }
 
+    private void adjustprice(String instrument, Map<String, Double> prices, boolean increase){
+        double price = prices.get(instrument);
+        if(increase){
+            prices.put(instrument, price * 1.1);
+        }else{
+            prices.put(instrument, price * 0.9);
+        }
+    }
     private String createFIXMessage(boolean executed, String instrument, int quantity, double price, int clientId, int brokerId){
         StringBuilder response = new StringBuilder();
         response.append("8=FIX.4.2|");

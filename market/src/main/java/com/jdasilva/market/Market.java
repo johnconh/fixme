@@ -14,12 +14,18 @@ public class Market {
     private static final String host = "localhost";
 
     private Map<String, Integer> inventory = new HashMap<>();
+    private Map<String, Double> prices = new HashMap<>();
 
     public Market(){
         inventory.put("AAPL", 1000);
         inventory.put("GOOGL", 500);
         inventory.put("AMZN", 200);
         inventory.put("MSFT", 300);
+
+        prices.put("AAPL", 150.0);
+        prices.put("GOOGL", 1000.0);
+        prices.put("AMZN", 2000.0);
+        prices.put("MSFT", 300.0);
         buildChain();
     }
 
@@ -65,7 +71,7 @@ public class Market {
                     if (!order.isEmpty() )
                     {
                         System.out.println("Order received: " + order);
-                        handler.handle(order, marketId, this::sendResponse, inventory);
+                        handler.handle(order, marketId, this::sendResponse, inventory, prices);
                     }
                 }
             }
