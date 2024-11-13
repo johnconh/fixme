@@ -4,6 +4,9 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
+import java.util.Scanner;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class Broker {
     private SocketChannel socket;
@@ -12,6 +15,8 @@ public class Broker {
     private Handler handler;
     private static final int port = 5000;
     private static final String host = "localhost";
+    private Scanner scanner;
+    private ExecutorService executorService = Executors.newSingleThreadExecutor();
 
     public void start() {
         try{
@@ -28,21 +33,61 @@ public class Broker {
                 System.out.println("Broker " + brokerId + " connected to the server");
 
                 sendOrder("Buy", "AAPL", 100, 150.0);
-                //sendOrder("Sell", "GOOGL", 50, 100.0);
-
+                sendOrder("Sell", "GOOGL", 50, 100.0);
                 listenForResponses();
+                //executorService.submit(this::listenForResponses);
+                //processOrders();
+
             } catch (IOException e) {
                 System.err.println("Broker failed to connect to the server");
-                e.printStackTrace();
             }
         }catch(Exception e){
             System.err.println("Broker failed to connect to the server");
-            e.printStackTrace();
         } finally {
             close();
         }
     }
 
+    private void processOrders(){
+        scanner = new Scanner(System.in);
+        String action, instrument;
+        int quantity;
+        double price;
+        while(true){
+            try{
+                System.out.println("Enter the action (Buy/Sell): ");
+                action = scanner.nextLine().trim();
+                if(!action.equalsIgnoreCase("Buy") && !action.equalsIgnoreCase("Sell")){
+                    System.out.println("Invalid action. Please enter Buy or Sell");
+                    continue;
+                }
+                System.out.println("Enter the instrument: ");
+                instrument = scanner.nextLine().trim();
+                if(instrument.isEmpty()){
+                    System.out.println("Invalid instrument. Please enter a valid instrument");
+                    continue;
+                }
+                System.out.println("Enter the quantity: ");
+                quantity = scanner.nextInt();
+                if(quantity <= 0 || String.valueOf(quantity).length() > 10){
+                    System.out.println("Invalid quantity. Please enter a valid quantity");
+                    continue;
+                }
+                System.out.println("Enter the price: ");
+                price = scanner.nextDouble();
+                if (price <= 0 || String.valueOf(price).length() > 10) {
+                    System.out.println("Invalid price. Please enter a valid price");
+                    continue;
+                }
+                sendOrder(action, instrument, quantity, price);
+                Thread.sleep(500);
+                scanner.nextLine();
+            }catch(Exception e){
+                System.err.println("Broker failed to process the order");
+            
+            }
+        }
+    }
     private void  sendOrder(String action, String instrument, int quantity, double price){
         message = new StringBuilder();
         handler = new FIXMessageHandler(brokerId);
@@ -77,6 +122,7 @@ public class Broker {
     }
 
     public void close(){
+        //scanner.close();
         try{
             socket.close();
             System.out.println("Broker " + brokerId + " disconnected from the server");
