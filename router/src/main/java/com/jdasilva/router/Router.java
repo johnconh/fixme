@@ -17,7 +17,6 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
 import com.jdasilva.database.databaseManager;
 import java.util.Random;
 import java.util.List;

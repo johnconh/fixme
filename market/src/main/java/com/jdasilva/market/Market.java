@@ -12,7 +12,6 @@ public class Market {
     private Handler handler;
     private static final int port = 5001;
     private static final String host = "localhost";
-
     private Map<String, Integer> inventory = new HashMap<>();
     private Map<String, Double> prices = new HashMap<>();
 

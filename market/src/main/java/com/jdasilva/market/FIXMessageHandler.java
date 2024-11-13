@@ -76,6 +76,7 @@ public class FIXMessageHandler extends BaseHandler {
             System.out.println("=== Price of " + instrument + " decreased to " + prices.get(instrument) + " ====");
         }
     }
+    
     private String createFIXMessage(boolean executed, String instrument, int quantity, double price, int clientId, int brokerId){
         StringBuilder response = new StringBuilder();
         response.append("8=FIX.4.2|");
