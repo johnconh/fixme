@@ -50,41 +50,57 @@ public class Broker {
 
     private void processOrders(){
         scanner = new Scanner(System.in);
-        String action, instrument;
-        int quantity;
-        double price;
+        String action = "", instrument = "";
+        int quantity = 0;
+        double price = 0.0;
         while(true){
             try{
-                System.out.println("Enter the action (Buy/Sell): ");
-                action = scanner.nextLine().trim();
-                if(!action.equalsIgnoreCase("Buy") && !action.equalsIgnoreCase("Sell")){
-                    System.out.println("Invalid action. Please enter Buy or Sell");
-                    continue;
+                while (true) {
+                    System.out.println("Enter the action (Buy/Sell): ");
+                    action = scanner.nextLine().trim();
+                    if (action.equalsIgnoreCase("Buy") || action.equalsIgnoreCase("Sell")) {
+                        break;
+                    }
+                    System.out.println("Invalid action. Please enter 'Buy' or 'Sell'.");
                 }
-                System.out.println("Enter the instrument: ");
-                instrument = scanner.nextLine().trim();
-                if(instrument.isEmpty()){
-                    System.out.println("Invalid instrument. Please enter a valid instrument");
-                    continue;
+    
+                while (true) {
+                    System.out.println("Enter the instrument: ");
+                    instrument = scanner.nextLine().trim();
+                    if (!instrument.isEmpty()) {
+                        break;
+                    }
+                    System.out.println("Invalid instrument. Please enter a valid instrument.");
                 }
-                System.out.println("Enter the quantity: ");
-                quantity = scanner.nextInt();
-                if(quantity <= 0 || String.valueOf(quantity).length() > 10){
-                    System.out.println("Invalid quantity. Please enter a valid quantity");
-                    continue;
+    
+                while (true) {
+                    System.out.println("Enter the quantity: ");
+                    try {
+                        quantity = Integer.parseInt(scanner.nextLine().trim());
+                        if (quantity > 0 && String.valueOf(quantity).length() <= 10) {
+                            break;
+                        }
+                        System.out.println("Invalid quantity. Please enter a positive integer.");
+                    } catch (NumberFormatException e) {
+                        System.out.println("Invalid input. Please enter a valid integer for quantity.");
+                    }
                 }
-                System.out.println("Enter the price: ");
-                price = scanner.nextDouble();
-                if (price <= 0 || String.valueOf(price).length() > 10) {
-                    System.out.println("Invalid price. Please enter a valid price");
-                    continue;
+    
+                while (true) {
+                    System.out.println("Enter the price: ");
+                    try {
+                        price = Double.parseDouble(scanner.nextLine().trim());
+                        if (price > 0 && String.valueOf(price).length() <= 10) {
+                            break;
+                        }
+                        System.out.println("Invalid price. Please enter a positive number.");
+                    } catch (NumberFormatException e) {
+                        System.out.println("Invalid input. Please enter a valid number for price.");
+                    }
                 }
                 sendOrder(action, instrument, quantity, price);
-                Thread.sleep(1000);
-                scanner.nextLine();
             }catch(Exception e){
-                System.err.println("Broker failed to process the order");
-            
+                System.err.println("An unexpected error occurred: " + e.getMessage());
             }
         }
     }
@@ -115,7 +131,7 @@ public class Broker {
                 if(!response.isEmpty()){
                     System.out.println("Message received: " + response);
                 }
-                Thread.sleep(1000);
+                //Thread.sleep(1000);
             }
         }catch(Exception e){
             System.err.println("Broker failed to receive the message");
