@@ -201,7 +201,8 @@ public class Router {
     }
 
     private void retryFailedTransactions(SocketChannel socket, int idClient, String type) {
-        List <Map<String, Object>> faliedTransactions = databaseManager.getFailedTransactions(type);
+        String oppositeType = type.equals("Broker") ? "Market" : "Broker";
+        List <Map<String, Object>> faliedTransactions = databaseManager.getFailedTransactions(oppositeType);
         if (faliedTransactions.isEmpty()) {return;}
         System.out.println("Retrying failed transactions for " + type);
         for(Map<String, Object> transaction : faliedTransactions){

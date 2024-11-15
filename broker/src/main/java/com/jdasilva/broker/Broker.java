@@ -80,7 +80,7 @@ public class Broker {
                     continue;
                 }
                 sendOrder(action, instrument, quantity, price);
-                Thread.sleep(500);
+                Thread.sleep(1000);
                 scanner.nextLine();
             }catch(Exception e){
                 System.err.println("Broker failed to process the order");
